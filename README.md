@@ -1,127 +1,127 @@
-# FileOps & ProcOps Tools — Proiect Linux (SO 2026)
+# FileOps & ProcOps Tools — Linux Project (OS 2026)
 
-Acest repository conține realizarea incrementală a proiectului **FileOps & ProcOps Tools** pentru cursul de Sisteme de Operare (SO 2026). Proiectul constă într-un set complex de utilitare Linux care îmbină prelucrarea și indexarea arborilor de directoare (**FileOps**) cu monitorizarea și controlul proceselor active (**ProcOps**).
+This repository contains the incremental implementation of the **FileOps & ProcOps Tools** project for the Operating Systems course (OS 2026). The project consists of a complex set of Linux utilities that combine directory-tree processing and indexing (**FileOps**) with monitoring and control of active processes (**ProcOps**).
 
-Aplicațiile sunt scrise exclusiv în **limbajul C** (standard C11, compilat cu `-Wall -Wextra -Werror`), utilizând doar apeluri de sistem standard **POSIX** și biblioteca standard C, fără dependințe externe, garantând portabilitatea și performanța maximă în medii Linux.
-
----
-
-## 🚀 Structura și Evoluția Proiectului
-
-Proiectul este structurat sub formă de module independente pentru fiecare etapă a laboratorului (T3, T4, T5). Fiecare modul aduce o arhitectură distinctă și o complexitate tehnică specifică:
-
-### 📁 Organizarea directoarelor
-
-Pentru fiecare temă, structura obligatorie de directoare este următoarea:
-- `bin/` — Conține executabilele compilate.
-- `src/` — Codul sursă C (`.c`).
-- `include/` — Fișierele header C (`.h`).
-- `data/` — Fișierele de date persistente (baze de date binare `.db`, protocolul `ipc.mmap`).
-- `logs/` — Logurile de depanare și execuție.
-- `reports/` — Rapoartele text generate (ex: diff-uri între baze de date).
-- `tmp/` — Fișiere temporare necesare pentru asigurarea scrierilor atomice.
-- `tests/` — Scripturile bash de testare automată.
-- `doc/` — Documentația tehnică detaliată a formatelor binare și protocoalelor.
-- `tools/` — Scriptul de orchestrare `fileops.sh`.
+The applications are written exclusively in **C** (C11 standard, compiled with `-Wall -Wextra -Werror`), using only standard **POSIX** system calls and the C standard library, with no external dependencies, ensuring maximum portability and performance in Linux environments.
 
 ---
 
-## 🛠️ Module de Implementare (T3, T4, T5)
+## Project structure and evolution
 
-### 📌 [Tema T3](./T3/) — Baze de date binare și actualizare concurentă (SPMD)
-- **fileops_indexer**: Parcurge recursiv un arbore de directoare și salvează metadatele (cale absolută, tip, dimensiune, `mtime`, inod, device și un checksum XOR determinist al conținutului) într-o bază de date binară versionată (`data/index.db`).
-- **proc_snapshot**: Capturează starea proceselor curente din `/proc` (PID, PPID, stare, nume, linie de comandă, RSS și CPU time în clock ticks) și le scrie într-o bază de date binară (`data/proc.db`).
-- **Sincronizare Concurentă (SPMD)**: Multiple instanțe ale programelor pot rula în paralel, scriind în aceleași fișiere de baze de date. Sincronizarea este implementată direct pe fișier folosind lacăte exclusive și partajate prin apelul `fcntl(2)` (fără fișiere de lock externe).
-- **db_diff**: Compară două snapshot-uri (vechi vs. nou) de același tip și generează rapoarte text detaliate (`reports/T3_filediff.txt` sau `reports/T3_procdiff.txt`) evidențiind intrările adăugate, șterse sau modificate semnificativ.
+The project is structured as independent modules for each stage of the lab (T3, T4, T5). Each module introduces a distinct architecture and specific technical complexity:
 
-👉 *Pentru documentația detaliată a T3, accesați [README-ul din T3](./T3/README.md).*
+### Directory organization
 
----
-
-### 📌 [Tema T4](./T4/) — Inventariere Multiproces în C (`fork`/`exec` & `mmap`)
-- **Arhitectură Manager-Worker**: Un proces central (`fileops_manager`) coordonează `N` procese copii (`fileops_worker`) pornite prin `fork()` și `exec()`.
-- **IPC prin Memorie Partajată**: Comunicarea dintre procese se realizează extrem de rapid în RAM printr-un fișier mapat cu `mmap(..., MAP_SHARED, ...)`, care conține:
-  - Un header IPC cu configurări și stări globale.
-  - O coadă circulară de joburi pentru directoarele ce urmează a fi scanate (suportă joburi dinamice adăugate de workeri).
-  - Canale circulare de rezultate pentru file records.
-  - Zona de statistici active per worker.
-- **Sincronizare și Backpressure**: Sincronizarea resurselor partajate este asigurată de semafoare POSIX partajate între procese (`sem_t` în `mmap`). Se folosește o strategie de backpressure pentru a preveni pierderea de records sau suprascrierea bufferelor circulare.
-- **Scriere Atomic•**: Managerul agregă toate rezultatele din memoria partajată și scrie atomic baza de date binară finală (`data/inventory.db`) prin tehnica temp file (`tmp/data_base_tmp.db`) urmată de `rename(2)`. Include moduri CLI `--verify` și `--dump`.
-
-👉 *Pentru documentația detaliată a T4, accesați [README-ul din T4](./T4/README.md).*
+For each assignment, the required directory structure is as follows:
+- `bin/` — Contains the compiled executables.
+- `src/` — C source code (`.c`).
+- `include/` — C header files (`.h`).
+- `data/` — Persistent data files (binary databases `.db`, the `ipc.mmap` protocol).
+- `logs/` — Debug and execution logs.
+- `reports/` — Generated text reports (e.g., diffs between databases).
+- `tmp/` — Temporary files needed to ensure atomic writes.
+- `tests/` — Automated bash test scripts.
+- `doc/` — Detailed technical documentation of the binary formats and protocols.
+- `tools/` — The `fileops.sh` orchestration script.
 
 ---
 
-### 📌 [Tema T5](./T5/) — Control Plane, Semnale și Gestiune Grațioasă (Shutdown)
-- **Separarea Planurilor**: Separă complet *Data Plane* (job queue, rezultate în `mmap`) de *Control Plane* (comunicare prin canal pipe anonim unidirectional de la workeri la manager) și de *Signal Plane* (semnale de sistem).
-- **Protocolul Pipe (`T5MSG`)**: Workerii transmit mesaje scurte, atomice și asincrone (de progres: `JOB_DONE`, de finalizare: `WORKER_EXITING`, sau erori: `ERROR`) către Manager prin pipe. Managerul citește asincron folosind mod non-blocant (`O_NONBLOCK`).
-- **Gestiune Semnale (Signal Plane)**:
-  - `SIGUSR1`: Managerul afișează în timp real o linie de status stabilă și agregată în consolă (`STATUS queued_jobs=... active_jobs=...`).
-  - `SIGINT` / `SIGTERM`: Inițiază un shutdown grațios. Managerul oprește alocarea de joburi, notifică copiii, le acordă un timeout grațios (`--graceful-timeout`), iar ca ultim resort curăță procesele prin `SIGKILL`.
-  - `SIGCHLD`: Managerul colectează asincron statusurile workerilor prin `waitpid()` pentru a preveni apariția proceselor zombie.
-- **Semantica DB Incomplet**: Dacă inventarierea este întreruptă controlat de utilizator prin semnale, managerul asigură scrierea unei baze de date valide structural, dar marcată explicit în header cu flag-ul `complete=0`.
+## Implementation modules (T3, T4, T5)
 
-👉 *Pentru documentația detaliată a T5, accesați [README-ul din T5](./T5/README.md).*
+### [Assignment T3](./T3/) — Binary databases and concurrent updates (SPMD)
+- **fileops_indexer**: Recursively traverses a directory tree and saves the metadata (absolute path, type, size, `mtime`, inode, device, and a deterministic XOR checksum of the content) into a versioned binary database (`data/index.db`).
+- **proc_snapshot**: Captures the state of current processes from `/proc` (PID, PPID, state, name, command line, RSS, and CPU time in clock ticks) and writes them into a binary database (`data/proc.db`).
+- **Concurrent synchronization (SPMD)**: Multiple instances of the programs can run in parallel, writing to the same database files. Synchronization is implemented directly on the file using exclusive and shared locks via the `fcntl(2)` call (no external lock files).
+- **db_diff**: Compares two snapshots (old vs. new) of the same type and generates detailed text reports (`reports/T3_filediff.txt` or `reports/T3_procdiff.txt`) highlighting added, deleted, or significantly modified entries.
+
+*For detailed T3 documentation, see the [T3 README](./T3/README.md).*
 
 ---
 
-## 🛠️ Compilare, Rulare și Testare
+### [Assignment T4](./T4/) — Multi-process inventory in C (`fork`/`exec` & `mmap`)
+- **Manager-Worker architecture**: A central process (`fileops_manager`) coordinates `N` child processes (`fileops_worker`) started via `fork()` and `exec()`.
+- **IPC via shared memory**: Communication between processes happens extremely fast in RAM through a file mapped with `mmap(..., MAP_SHARED, ...)`, which contains:
+  - An IPC header with global configuration and state.
+  - A circular job queue for the directories to be scanned (supports dynamic jobs added by workers).
+  - Circular result channels for file records.
+  - A per-worker active statistics area.
+- **Synchronization and backpressure**: Synchronization of shared resources is ensured by POSIX semaphores shared between processes (`sem_t` in `mmap`). A backpressure strategy is used to prevent record loss or overwriting of the circular buffers.
+- **Atomic writes**: The manager aggregates all results from shared memory and atomically writes the final binary database (`data/inventory.db`) using the temp-file technique (`tmp/data_base_tmp.db`) followed by `rename(2)`. Includes the CLI modes `--verify` and `--dump`.
 
-Orchestrarea build-ului, rulării și testelor se face unitar prin intermediul scriptului centralizator `./tools/fileops.sh`.
+*For detailed T4 documentation, see the [T4 README](./T4/README.md).*
 
-### 1. Inițializarea structurii și compilarea surselor
+---
+
+### [Assignment T5](./T5/) — Control Plane, Signals, and Graceful Shutdown
+- **Plane separation**: Completely separates the *Data Plane* (job queue, results in `mmap`) from the *Control Plane* (communication via a unidirectional anonymous pipe from workers to the manager) and the *Signal Plane* (system signals).
+- **Pipe protocol (`T5MSG`)**: Workers send short, atomic, asynchronous messages (progress: `JOB_DONE`, completion: `WORKER_EXITING`, or errors: `ERROR`) to the Manager via the pipe. The Manager reads asynchronously in non-blocking mode (`O_NONBLOCK`).
+- **Signal handling (Signal Plane)**:
+  - `SIGUSR1`: The manager prints a stable, aggregated status line to the console in real time (`STATUS queued_jobs=... active_jobs=...`).
+  - `SIGINT` / `SIGTERM`: Initiates a graceful shutdown. The manager stops allocating jobs, notifies the children, grants them a graceful timeout (`--graceful-timeout`), and as a last resort cleans up the processes via `SIGKILL`.
+  - `SIGCHLD`: The manager asynchronously collects worker statuses via `waitpid()` to prevent zombie processes.
+- **Incomplete DB semantics**: If the inventory is interrupted in a controlled way by the user via signals, the manager ensures a structurally valid database is written, but explicitly marked in the header with the `complete=0` flag.
+
+*For detailed T5 documentation, see the [T5 README](./T5/README.md).*
+
+---
+
+## Build, run, and test
+
+Build, run, and test orchestration is done uniformly through the centralizing script `./tools/fileops.sh`.
+
+### 1. Initialize the structure and compile the sources
 ```bash
-# Creează directoarele necesare
+# Create the required directories
 ./tools/fileops.sh init
 
-# Compilează codul sursă C cu opțiunile -Wall -Wextra -Werror -std=c11
+# Compile the C source code with -Wall -Wextra -Werror -std=c11
 ./tools/fileops.sh build
 ```
 
-### 2. Rularea Utilitarelor (Exemple)
+### 2. Running the utilities (examples)
 
-**Mod SPMD Concurent (T3):**
+**Concurrent SPMD mode (T3):**
 ```bash
-# Pornirea indexării unui director (pot fi lansate multiple instanțe concurente pe același DB)
-./tools/fileops.sh run -- fileops_indexer --root /cale/director --db data/index.db
+# Start indexing a directory (multiple concurrent instances can run on the same DB)
+./tools/fileops.sh run -- fileops_indexer --root /path/to/dir --db data/index.db
 
-# Capturarea unui snapshot de procese din /proc
+# Capture a process snapshot from /proc
 ./tools/fileops.sh run -- proc_snapshot --db data/proc.db
 
-# Compararea a două snapshot-uri
+# Compare two snapshots
 ./tools/fileops.sh run -- db_diff --old data/index_old.db --new data/index_new.db --out reports/T3_filediff.txt
 ```
 
-**Mod Manager-Worker Multiproces (T4 & T5):**
+**Multi-process Manager-Worker mode (T4 & T5):**
 ```bash
-# Pornirea managerului de inventar cu 4 workeri și timeout de 5 secunde
-./tools/fileops.sh run -- fileops_manager --root /cale/director --workers 4 --ipc data/ipc.mmap --db data/inventory.db --graceful-timeout 5 --pid-file tmp/manager.pid
+# Start the inventory manager with 4 workers and a 5-second timeout
+./tools/fileops.sh run -- fileops_manager --root /path/to/dir --workers 4 --ipc data/ipc.mmap --db data/inventory.db --graceful-timeout 5 --pid-file tmp/manager.pid
 ```
 
-**Verificarea și Dump-ul Bazelor de Date:**
+**Verifying and dumping the databases:**
 ```bash
-# Validează integritatea structurală a bazei de date
+# Validate the structural integrity of the database
 ./tools/fileops.sh run -- fileops_manager --db data/inventory.db --verify
 
-# Afișează metadatele bazei de date sub formă de cheie=valoare
+# Print the database metadata as key=value pairs
 ./tools/fileops.sh run -- fileops_manager --db data/inventory.db --dump
 ```
 
-### 3. Rularea Testelor Automate
-Fiecare modul conține teste neinteractive menite să valideze scenariile complexe de execuție concurentă, sincronizare mmap și tratare a semnalelor.
+### 3. Running the automated tests
+Each module contains non-interactive tests meant to validate complex scenarios of concurrent execution, mmap synchronization, and signal handling.
 ```bash
 ./tools/fileops.sh test
 ```
 
 ---
 
-## 📚 Documentație Tehnică Detaliată
+## Detailed technical documentation
 
-Pentru detalii tehnice aprofundate la nivel de protocol și format binar, vă rugăm să consultați fișierele din directoarele de documentație:
-- [T3/doc/Format_DB.md](./T3/doc/Format_DB.md) — Structura exactă a headerelor și recordurilor pentru bazele de date din T3 (`index.db` și `proc.db`).
-- [T4/doc/MMAP_PROTOCOL.md](./T4/doc/MMAP_PROTOCOL.md) — Layout-ul detaliat al memoriei partajate, structura cozilor circulare de joburi și rezultate din T4.
-- [T4/doc/T4_DB_FORMAT.md](./T4/doc/T4_DB_FORMAT.md) — Formatul binar al bazei de date finale `inventory.db` produse de manager.
-- [T5/doc/T5_CONTROL_PLANE.md](./T5/doc/T5_CONTROL_PLANE.md) — Structura canalelor pipe de control plane, formatul mesajelor `T5MSG` și mecanismele asincrone de semnalizare.
+For in-depth technical details at the protocol and binary-format level, please refer to the files in the documentation directories:
+- [T3/doc/Format_DB.md](./T3/doc/Format_DB.md) — The exact structure of the headers and records for the T3 databases (`index.db` and `proc.db`).
+- [T4/doc/MMAP_PROTOCOL.md](./T4/doc/MMAP_PROTOCOL.md) — The detailed shared-memory layout and the structure of the circular job and result queues in T4.
+- [T4/doc/T4_DB_FORMAT.md](./T4/doc/T4_DB_FORMAT.md) — The binary format of the final `inventory.db` database produced by the manager.
+- [T5/doc/T5_CONTROL_PLANE.md](./T5/doc/T5_CONTROL_PLANE.md) — The structure of the control-plane pipe channels, the `T5MSG` message format, and the asynchronous signaling mechanisms.
 
 ---
-*Proiect realizat în cadrul laboratorului de Sisteme de Operare, 2026.*
+*Project developed as part of the Operating Systems lab, 2026.*
