@@ -4,8 +4,6 @@ This repository contains the incremental implementation of the **FileOps & ProcO
 
 The applications are written exclusively in **C** (C11 standard, compiled with `-Wall -Wextra -Werror`), using only standard **POSIX** system calls and the C standard library, with no external dependencies, ensuring maximum portability and performance in Linux environments.
 
----
-
 ## Project structure and evolution
 
 The project is structured as independent modules for each stage of the lab (T3, T4, T5). Each module introduces a distinct architecture and specific technical complexity:
@@ -24,8 +22,6 @@ For each assignment, the required directory structure is as follows:
 - `doc/` — Detailed technical documentation of the binary formats and protocols.
 - `tools/` — The `fileops.sh` orchestration script.
 
----
-
 ## Implementation modules (T3, T4, T5)
 
 ### [Assignment T3](./T3/) — Binary databases and concurrent updates (SPMD)
@@ -35,8 +31,6 @@ For each assignment, the required directory structure is as follows:
 - **db_diff**: Compares two snapshots (old vs. new) of the same type and generates detailed text reports (`reports/T3_filediff.txt` or `reports/T3_procdiff.txt`) highlighting added, deleted, or significantly modified entries.
 
 *For detailed T3 documentation, see the [T3 README](./T3/README.md).*
-
----
 
 ### [Assignment T4](./T4/) — Multi-process inventory in C (`fork`/`exec` & `mmap`)
 - **Manager-Worker architecture**: A central process (`fileops_manager`) coordinates `N` child processes (`fileops_worker`) started via `fork()` and `exec()`.
@@ -50,8 +44,6 @@ For each assignment, the required directory structure is as follows:
 
 *For detailed T4 documentation, see the [T4 README](./T4/README.md).*
 
----
-
 ### [Assignment T5](./T5/) — Control Plane, Signals, and Graceful Shutdown
 - **Plane separation**: Completely separates the *Data Plane* (job queue, results in `mmap`) from the *Control Plane* (communication via a unidirectional anonymous pipe from workers to the manager) and the *Signal Plane* (system signals).
 - **Pipe protocol (`T5MSG`)**: Workers send short, atomic, asynchronous messages (progress: `JOB_DONE`, completion: `WORKER_EXITING`, or errors: `ERROR`) to the Manager via the pipe. The Manager reads asynchronously in non-blocking mode (`O_NONBLOCK`).
@@ -62,8 +54,6 @@ For each assignment, the required directory structure is as follows:
 - **Incomplete DB semantics**: If the inventory is interrupted in a controlled way by the user via signals, the manager ensures a structurally valid database is written, but explicitly marked in the header with the `complete=0` flag.
 
 *For detailed T5 documentation, see the [T5 README](./T5/README.md).*
-
----
 
 ## Build, run, and test
 
@@ -113,8 +103,6 @@ Each module contains non-interactive tests meant to validate complex scenarios o
 ./tools/fileops.sh test
 ```
 
----
-
 ## Detailed technical documentation
 
 For in-depth technical details at the protocol and binary-format level, please refer to the files in the documentation directories:
@@ -123,5 +111,4 @@ For in-depth technical details at the protocol and binary-format level, please r
 - [T4/doc/T4_DB_FORMAT.md](./T4/doc/T4_DB_FORMAT.md) — The binary format of the final `inventory.db` database produced by the manager.
 - [T5/doc/T5_CONTROL_PLANE.md](./T5/doc/T5_CONTROL_PLANE.md) — The structure of the control-plane pipe channels, the `T5MSG` message format, and the asynchronous signaling mechanisms.
 
----
 *Project developed as part of the Operating Systems lab, 2026.*
